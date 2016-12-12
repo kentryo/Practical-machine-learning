@@ -1,0 +1,89 @@
+---
+title: "Practical Machine Learning Project"
+author: "RH"
+date: "December 11, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Introduction
+This is a project for practical machine learning course on Coursera. The project was to predict classe variable using presonal activity motion data. The data was from http://groupware.les.inf.puc-rio.br/har (Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4SZT9ckQR). 
+
+As is stated in the project requirement, using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+#Load required packages
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+
+#Import the data and perform necessary data cleaning
+Import the data of training and testing from the previous described urls.
+```{r}
+url_train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+train <- read.csv(url(url_train), na.strings = c("NA","#DIV/0!",""))
+test <- read.csv(url(url_test), na.strings = c("NA","#DIV/0!",""))
+```
+
+Clean the data for later model building. I removed the 1st to 7th variable as it is irrelavent to the model. Then I removed the variables with NA values. Then I removed the variables with variance close to zero.
+```{r}
+train <- train[ ,-c(1:7)]
+train <- train[ ,colSums(is.na(train)) == 0]
+NZV_train <- nearZeroVar(train, saveMetrics = TRUE)
+```
+As the remiaining variables processed after the previous steps don't have variance near zero. There is no need to remove any variables.
+
+#Subset the training set into training set and test set.
+The train dataset was subset into a train dataset and a test dataset.
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(y = train$classe, p = 0.7, list = FALSE)
+train_train <- train[inTrain, ]
+train_test <- train[-inTrain, ]
+```
+
+#Classification Tree prediction model
+First, I use the classification tree model for prediction.
+```{r}
+mod_tree <- train(classe ~ ., data = train_train, method = "rpart")
+mod_tree$finalModel
+rpart.plot(mod_tree$finalModel)
+```
+
+Since the classification tree model cannot predict the classe variable into A, B, C and E. The model is not capable for the job. I will use random forest to build a new model for prediction.
+
+#Random forest model
+```{r}
+mod_RF <- randomForest(classe ~., data = train_train)
+mod_RF
+```
+Estimate the accuracy using the train_test dataset.
+```{r}
+pred_RF <- predict(mod_RF, newdata = train_test)
+confusionMatrix(pred_RF, train_test$classe)
+```
+As is stated above, the accuracy of random forest model is `r confusionMatrix(pred_RF, train_test$classe)$overall[1]`.
+
+#Prediction of the test dataset.
+Finally, I use the random forest model to predict the test set.
+```{r}
+pred_test <- predict(mod_RF, newdata = test)
+pred_test
+```
